@@ -6,8 +6,9 @@ import os
 
 from .services.data_provider import get_history_df, BusinessCalendar
 from .services.models import quantile_forecast, backtest_metrics
+from .services.openai_forecaster import llm_quantile_forecast
 
-app = FastAPI(title="ETF Forecast API", version="0.1.0")
+app = FastAPI(title="ETF Forecast API", version="0.2.0")
 
 origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",") if o.strip()]
 app.add_middleware(
@@ -64,12 +65,22 @@ def forecast(ticker: str, days: int = 90):
             confidence="E",
         )
 
-    # Compute quantile forecast path
     cal = BusinessCalendar()
     future_dates = cal.next_business_days(date.today(), days)
-    path_df, horizons, _ = quantile_forecast(df, future_dates)
 
-    # Build response path: last 90 days history + future horizon bands
+    engine = os.getenv("FORECAST_ENGINE", "auto")
+    use_llm = engine == "llm" or (engine == "auto" and os.getenv("OPENAI_API_KEY"))
+
+    try:
+        if use_llm:
+            path_df, horizons, _ = llm_quantile_forecast(df, future_dates)
+        else:
+            path_df, horizons, _ = quantile_forecast(df, future_dates)
+    except Exception:
+        # fallback robuste si l'LLM échoue
+        path_df, horizons, _ = quantile_forecast(df, future_dates)
+
+    # Historique (90j) + futur
     hist_tail = df.tail(90).copy()
     hist_points = [
         PathPoint(date=d.strftime("%Y-%m-%d"), actual=float(v), p10=None, p50=None, p90=None)
@@ -85,10 +96,8 @@ def forecast(ticker: str, days: int = 90):
         )
         for d, row in path_df.iterrows()
     ]
-    # Backtest metrics (simple walk-forward, documented in services.models)
-    m = backtest_metrics(df)
 
-    # Simple confidence mapping based on error vs baseline
+    m = backtest_metrics(df)
     rel = (m["baseline_mae"] + 1e-9) / (m["mae"] + 1e-9)
     if rel > 1.25:
         conf = "A"
