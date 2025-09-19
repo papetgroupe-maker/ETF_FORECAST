@@ -1,4 +1,6 @@
 // frontend/lib/api.ts
+// TS-safe : pas d'appel .trim() sur undefined ; bascule auto vers la route serverless locale.
+
 export function apiBase(): string {
   const v = process.env.NEXT_PUBLIC_BACKEND_URL;
   return typeof v === "string" && v.trim().length > 0 ? v.trim() : "";
