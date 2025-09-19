@@ -2,26 +2,33 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Base theme */
 :root {
-  --bg: 255 255 255;
-  --fg: 17 24 39;
+  --bg: hsl(240 10% 7%);
+  --card: hsl(240 10% 10%);
+  --border: hsl(240 10% 18%);
+  --text: hsl(0 0% 98%);
+  --mut: hsl(0 0% 70%);
 }
-body {
-  color: rgb(var(--fg));
-  background: rgb(var(--bg));
+
+html, body {
+  background: radial-gradient(1200px 600px at 10% -10%, rgba(91,140,255,.25), transparent 60%),
+              radial-gradient(1000px 600px at 110% 0%, rgba(162,89,255,.18), transparent 60%),
+              var(--bg);
+  color: var(--text);
 }
-.container {
-  @apply max-w-6xl mx-auto px-4;
-}
+
+/* Containers / cards / badges */
 .card {
-  @apply bg-white rounded-2xl shadow-md border border-gray-100;
-}
-.btn {
-  @apply inline-flex items-center justify-center px-4 py-2 rounded-xl font-medium border border-gray-200 hover:border-gray-300 transition;
-}
-.btn-primary {
-  @apply bg-black text-white hover:bg-gray-800;
+  @apply bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-soft;
+  backdrop-filter: blur(8px);
 }
 .badge {
-  @apply inline-flex items-center rounded-full px-3 py-1 text-sm border;
+  @apply inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs border bg-black/20 text-[var(--mut)];
 }
+
+/* Links */
+a { @apply text-brand-500 hover:text-brand-600 transition-colors; }
+
+/* Simple util for section spacing */
+.section { @apply py-8 md:py-12; }
