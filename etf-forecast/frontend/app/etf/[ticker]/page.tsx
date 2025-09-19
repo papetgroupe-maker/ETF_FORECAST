@@ -11,6 +11,8 @@ type ForecastResp = {
   ticker: string; as_of: string; horizons: number[]; path: PathPoint[]; metrics: Metrics; confidence: string;
 };
 
+function pct(a: number, b: number) { return b === 0 ? 0 : (a - b) / b; }
+
 export default function ETFPage() {
   const params = useParams<{ ticker: string }>();
   const ticker = (params?.ticker || "").toString().toUpperCase();
@@ -23,14 +25,12 @@ export default function ETFPage() {
     if (!ticker) return;
     const load = async () => {
       setLoading(true); setError(null);
-      const primary = forecastUrl(ticker, 90);
-      const local = `/api/forecast/${encodeURIComponent(ticker)}?days=90`;
       try {
-        const res = await axios.get(primary);
+        const res = await axios.get(forecastUrl(ticker, 90));
         setData(res.data);
       } catch {
         try {
-          const res = await axios.get(local);
+          const res = await axios.get(`/api/forecast/${encodeURIComponent(ticker)}?days=90`);
           setData(res.data);
         } catch {
           setError("Impossible de charger les prévisions.");
@@ -41,6 +41,24 @@ export default function ETFPage() {
     };
     load();
   }, [ticker]);
+
+  const actualSeries = useMemo(() => (data?.path.filter(p => p.actual !== null) ?? []) as PathPoint[], [data]);
+
+  const priceBox = useMemo(() => {
+    if (!actualSeries.length) return null;
+    const last = actualSeries[actualSeries.length-1].actual as number;
+    const prev = actualSeries.length>1 ? (actualSeries[actualSeries.length-2].actual as number) : last;
+    const mBack = actualSeries.length>22 ? (actualSeries[actualSeries.length-22].actual as number) : actualSeries[0].actual as number;
+    const year = new Date().getFullYear().toString();
+    const ytdIdx = actualSeries.findIndex(p => p.date.startsWith(year));
+    const ytdBase = ytdIdx>=0 ? (actualSeries[ytdIdx].actual as number) : (actualSeries[0].actual as number);
+    return {
+      price: last,
+      d1: pct(last, prev),
+      m1: pct(last, mBack),
+      ytd: pct(last, ytdBase),
+    };
+  }, [actualSeries]);
 
   const seriesForHorizon = useMemo(() => {
     if (!data) return [];
@@ -65,6 +83,18 @@ export default function ETFPage() {
         </div>
       </div>
 
+      {priceBox && (
+        <div className="card p-5 flex flex-wrap items-center gap-6">
+          <div>
+            <div className="text-sm text-gray-500">Cours actuel</div>
+            <div className="text-3xl font-bold">{priceBox.price.toFixed(2)}</div>
+          </div>
+          <div className="badge border-gray-300">1J { (priceBox.d1*100).toFixed(2)}%</div>
+          <div className="badge border-gray-300">1M { (priceBox.m1*100).toFixed(2)}%</div>
+          <div className="badge border-gray-300">YTD { (priceBox.ytd*100).toFixed(2)}%</div>
+        </div>
+      )}
+
       {loading && <div className="card p-6">Chargement…</div>}
       {error && <div className="card p-6 text-red-600">{error}</div>}
 
@@ -73,9 +103,10 @@ export default function ETFPage() {
           <div className="card p-4">
             <ForecastChart series={seriesForHorizon} />
           </div>
+
           <div className="grid md:grid-cols-3 gap-6">
             <div className="card p-6">
-              <div className="font-semibold">Métriques (backtest)</div>
+              <div className="font-semibold">Métriques (indicatives)</div>
               <ul className="mt-3 space-y-1 text-sm text-gray-700">
                 <li>MAE: {data.metrics.mae.toFixed(3)}</li>
                 <li>MAPE: {(data.metrics.mape*100).toFixed(2)}%</li>
