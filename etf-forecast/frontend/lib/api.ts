@@ -1,10 +1,13 @@
-// Si NEXT_PUBLIC_BACKEND_URL est défini, on appelle le backend externe.
-// Sinon on utilise la route Next.js locale créée ci-dessus.
-export const apiBase = () => process.env.NEXT_PUBLIC_BACKEND_URL?.trim() || "";
+// frontend/lib/api.ts
+export function apiBase(): string {
+  const v = process.env.NEXT_PUBLIC_BACKEND_URL;
+  return typeof v === "string" && v.trim().length > 0 ? v.trim() : "";
+}
 
-export const forecastUrl = (ticker: string, days: number) => {
+export function forecastUrl(ticker: string, days: number): string {
   const be = apiBase();
+  const t = encodeURIComponent(ticker);
   return be
-    ? `${be}/api/v1/etf/${encodeURIComponent(ticker)}/forecast?days=${days}`
-    : `/api/forecast/${encodeURIComponent(ticker)}?days=${days}`;
-};
+    ? `${be}/api/v1/etf/${t}/forecast?days=${days}`
+    : `/api/forecast/${t}?days=${days}`;
+}
